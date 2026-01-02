@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}{{ short_url.short_code }} - Details{% endblock %}
+
+{% block content %}
+<div class="card">
+    <a href="/admin/dashboard" class="btn btn-secondary" style="margin-bottom: 1rem;">← Back to Dashboard</a>
+
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success">
+        {{ request.query_params.get('success') }}
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get('error') %}
+    <div class="alert alert-error">
+        {{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    <h2>Short URL: {{ short_url.short_code }}</h2>
+
+    <table style="margin-bottom: 2rem;">
+        <tr>
+            <th style="width: 200px;">ID</th>
+            <td>{{ short_url.id }}</td>
+        </tr>
+        <tr>
+            <th>Short Code</th>
+            <td><strong>{{ short_url.short_code }}</strong></td>
+        </tr>
+        <tr>
+            <th>Title</th>
+            <td>{{ short_url.title or '-' }}</td>
+        </tr>
+        <tr>
+            <th>Original URL</th>
+            <td><a href="{{ short_url.original_url }}" target="_blank">{{ short_url.original_url }}</a></td>
+        </tr>
+        <tr>
+            <th>Redirect URL</th>
+            <td>
+                {% if short_url.redirect_url %}
+                <a href="{{ short_url.redirect_url }}" target="_blank">{{ short_url.redirect_url }}</a>
+                {% else %}
+                INVALID
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Forward Query Params</th>
+            <td>{{ 'Yes' if short_url.forward_query else 'No' }}</td>
+        </tr>
+        <tr>
+            <th>Created</th>
+            <td>{{ short_url.date_created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        </tr>
+        <tr>
+            <th>Max Visits</th>
+            <td>{{ short_url.max_visits or 'Unlimited' }}</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3>A/B Tests</h3>
+
+    <div style="margin: 1rem 0;">
+        <strong>Total Probability Used:</strong> {{ "%.1f"|format(total_probability * 100) }}%
+        <div class="probability-bar">
+            <div class="probability-fill" style="width: {{ total_probability * 100 }}%"></div>
+        </div>
+        <p style="margin-top: 0.5rem; color: #666;">
+            Remaining for primary URL: {{ "%.1f"|format(remaining_probability * 100) }}%
+        </p>
+    </div>
+
+    {% if ab_tests %}
+    <div class="table-wrapper">
+        <table style="margin-bottom: 2rem;">
+            <thead>
+                <tr>
+                    <th>Target URL</th>
+                    <th>Probability</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for test in ab_tests %}
+                <tr>
+                    <td>
+                        <div class="url-truncate" title="{{ test.target_url }}">
+                            <a href="{{ test.target_url }}" target="_blank">{{ test.target_url }}</a>
+                        </div>
+                    </td>
+                    <td>{{ "%.1f"|format(test.probability * 100) }}%</td>
+                    <td>
+                        <span class="badge {% if test.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                            {{ 'Active' if test.is_active else 'Inactive' }}
+                        </span>
+                    </td>
+                    <td>{{ test.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ test.updated_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <button
+                            onclick="showEditForm({{ test.id }}, '{{ test.target_url }}', {{ test.probability }}, {{ 'true' if test.is_active else 'false' }})"
+                            class="btn">Edit</button>
+                        <form action="/admin/ab_test/{{ test.id }}/delete" method="post" style="display: inline;"
+                            onsubmit="return confirm('Are you sure you want to delete this A/B test?');">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="color: #666; margin-bottom: 2rem;">No A/B tests configured. All traffic goes to the primary URL.</p>
+    {% endif %}
+
+    <div id="editFormContainer"
+        style="display: none; background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
+        <h4>Edit A/B Test</h4>
+        <form id="editForm" method="post">
+            <div class="form-group">
+                <label for="edit_target_url">Target URL</label>
+                <input type="text" id="edit_target_url" name="target_url" required>
+            </div>
+            <div class="form-group">
+                <label for="edit_probability">Probability (0.0 - 1.0)</label>
+                <input type="number" id="edit_probability" name="probability" step="0.01" min="0" max="1" required>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="edit_is_active" name="is_active" value="true">
+                    Active
+                </label>
+            </div>
+            <button type="submit" class="btn btn-success">Update Test</button>
+            <button type="button" onclick="hideEditForm()" class="btn btn-secondary">Cancel</button>
+        </form>
+    </div>
+
+    <details style="margin-top: 2rem;">
+        <summary style="cursor: pointer; font-weight: 600; margin-bottom: 1rem;">+ Create New A/B Test</summary>
+        <form action="/admin/short_url/{{ short_url.id }}/ab_test" method="post"
+            style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+            <div class="form-group">
+                <label for="target_url">Target URL</label>
+                <input type="text" id="target_url" name="target_url" placeholder="https://example.com/variant-a"
+                    required>
+            </div>
+            <div class="form-group">
+                <label for="probability">Probability</label>
+                <input type="number" id="probability" name="probability" step="0.01" min="0"
+                    max="{{remaining_probability}}" value="0.5" required>
+                <small style="color: #666;">Available: {{ "%.2f"|format(remaining_probability) }}</small>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_active" value="true" checked>
+                    Active
+                </label>
+            </div>
+            <button type="submit" class="btn btn-success">Create A/B Test</button>
+        </form>
+    </details>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showEditForm(id, targetUrl, probability, isActive) {
+        const form = document.getElementById('editForm');
+        form.action = `/admin/ab_test/${id}/update`;
+
+        document.getElementById('edit_target_url').value = targetUrl;
+        document.getElementById('edit_probability').value = probability;
+        document.getElementById('edit_is_active').checked = isActive;
+
+        document.getElementById('editFormContainer').style.display = 'block';
+
+        // Scroll to form
+        document.getElementById('editFormContainer').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideEditForm() {
+        document.getElementById('editFormContainer').style.display = 'none';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Short URLs</h2>
+
+    <div class="search-box">
+        <form method="get" action="/admin/dashboard" style="display: flex; align-items: center;">
+            <input type="text" name="search" placeholder="Search by short code or title..." value="{{ search }}">
+            <button type="submit" class="btn">Search</button>
+            {% if search %}
+            <a href="/admin/dashboard" class="btn btn-secondary" style="margin-left: 0.5rem;">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success">
+        {{ request.query_params.get('success') }}
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get('error') %}
+    <div class="alert alert-error">
+        {{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    <p style="margin-bottom: 1rem;">
+        Total: <strong>{{ total_count }}</strong> short URLs
+    </p>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Short Code</th>
+                    <th>Title</th>
+                    <th>Redirect URL</th>
+                    <th>A/B Tests</th>
+                    <th>Probability Used</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for url in short_urls %}
+                <tr>
+                    <td><strong>{{ url.short_code }}</strong></td>
+                    <td>{{ url.title or '-' }}</td>
+                    <td>
+                        <div class="url-truncate" title="{{ url.redirect_url }}">
+                            {{ url.redirect_url or "INVALID" }}
+                        </div>
+                    </td>
+                    <td>
+                        <span
+                            class="badge {% if url.ab_tests|length > 0 %}badge-active{% else %}badge-inactive{% endif %}">
+                            {{ url.ab_tests|length }}
+                        </span>
+                    </td>
+                    <td>{{ "%.1f"|format(url.total_probability * 100) }}% </td>
+                    <td>{{ url.date_created.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <a href="/admin/short_url/{{ url.id }}" class="btn">Details</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}">&laquo; Previous</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="active">{{ p }}</span>
+        {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %} <a
+            href="?page={{ p }}{% if search %}&search={{ search }}{% endif %}">{{ p }}</a>
+            {% elif p == page - 3 or p == page + 3 %}
+            <span>...</span>
+            {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %} <a href="?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}">
+                Next &raquo;</a>
+                {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
