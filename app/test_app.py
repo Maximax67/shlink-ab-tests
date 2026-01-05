@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from app.config import get_settings
 from app.models import Base, ShortUrl, ABTest
 from app.database import get_db
 from app.main import app
@@ -54,10 +55,12 @@ def client(test_db: Session) -> Generator[TestClient, Any, None]:
 @pytest.fixture
 def sample_short_url(test_db: Session) -> ShortUrl:
     """Create a sample short URL"""
+    settings = get_settings()
+    app_url = str(settings.app_url).rstrip("/")
     short_url = ShortUrl(
         id=1,
-        original_url="https://example.com/original",
-        short_code="test123",
+        original_url=f"{app_url}/?url=https://example.com/original",
+        short_code="test",
         date_created=datetime.now(timezone.utc),
         forward_query=True,
         title_was_auto_resolved=False,
@@ -66,26 +69,50 @@ def sample_short_url(test_db: Session) -> ShortUrl:
     test_db.add(short_url)
     test_db.commit()
     test_db.refresh(short_url)
+
     return short_url
 
 
 class TestRedirect:
     """Test redirect functionality"""
 
-    def test_redirect_short_code_not_found(self, client: TestClient) -> None:
+    def test_redirect_short_code_not_found(
+        self,
+        client: TestClient,
+        sample_short_url: ShortUrl,
+    ) -> None:
         """Test 404 for non-existent short code"""
-        response = client.get("/nonexistent")
+        response = client.get(
+            "/",
+            params={"url": "https://nonexistent.com"},
+        )
         assert response.status_code == 404
 
-    def test_redirect_to_primary_url(self, client: TestClient) -> None:
+    def test_redirect_to_primary_url(
+        self,
+        client: TestClient,
+        sample_short_url: ShortUrl,
+    ) -> None:
         """Test redirect to primary URL when no A/B tests"""
-        response = client.get("/test123", follow_redirects=False)
+        response = client.get(
+            "/",
+            params={"url": "https://example.com/original"},
+            follow_redirects=False,
+        )
         assert response.status_code == 307
         assert response.headers["location"] == "https://example.com/original"
 
-    def test_redirect_with_query_params(self, client: TestClient) -> None:
+    def test_redirect_with_query_params(
+        self,
+        client: TestClient,
+        sample_short_url: ShortUrl,
+    ) -> None:
         """Test query parameter forwarding"""
-        response = client.get("/test123?utm_source=test", follow_redirects=False)
+        response = client.get(
+            "/",
+            params={"url": "https://example.com/original", "utm_source": "test"},
+            follow_redirects=False,
+        )
         assert response.status_code == 307
         assert "utm_source=test" in response.headers["location"]
 

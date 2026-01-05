@@ -2,13 +2,10 @@
 Google Forms field mapping service with caching
 """
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Dict
-from google.oauth2 import service_account
-from googleapiclient.discovery import build  # type: ignore[import-untyped]
-from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
+from typing import Any, Optional, Dict, Set
+import requests
 
 from app.config import get_settings
 
@@ -21,68 +18,37 @@ class GoogleFormsFieldMapper:
     with built-in caching
     """
 
-    def __init__(self, service_account_file: str):
+    def __init__(
+        self,
+        app_script_url: str,
+        app_script_api_token: str,
+        cache_ttl: timedelta = timedelta(minutes=15),
+        fields_to_cache: Set[str] = set(
+            [
+                "utm_source",
+                "utm_medium",
+                "utm_campaign",
+                "click_id",
+                "click_timestamp",
+            ]
+        ),
+    ):
         """
         Initialize Google Forms API client
 
         Args:
-            service_account_file: Path to service account JSON file
+            app_script_url: URL to hosted App Script
+            app_script_api_token: App Script API token
         """
-        self.service_account_file = service_account_file
-        self.cache: Dict[tuple[str, str], tuple[str, datetime]] = (
+        self.app_script_url = app_script_url
+        self.app_script_api_token = app_script_api_token
+        self.cache: Dict[tuple[str, str], tuple[int, datetime]] = (
             {}
         )  # (form_id, field_name) -> (entry_id, timestamp)
-        self.form_cache: Dict[str, tuple[Dict[str, Any], datetime]] = (
-            {}
-        )  # form_id -> (form_data, timestamp)
-        self.cache_ttl = timedelta(minutes=15)
-        self.form_cache_ttl = timedelta(minutes=2)
-        self._service = None
+        self.cache_ttl = cache_ttl
+        self.fields_to_cache = fields_to_cache
 
-    @property
-    def service(self) -> Any:
-        """Lazy load Google Forms API service"""
-        if self._service is None:
-            try:
-                credentials = service_account.Credentials.from_service_account_file(
-                    self.service_account_file,
-                    scopes=["https://www.googleapis.com/auth/forms.body.readonly"],
-                )  # type: ignore[no-untyped-call]
-                self._service = build("forms", "v1", credentials=credentials)
-                logger.info("Google Forms API service initialized")
-            except Exception as e:
-                logger.error(f"Failed to initialize Google Forms API: {e}")
-                raise
-        return self._service
-
-    def _get_form(self, form_id: str) -> Optional[Dict[str, Any]]:
-        """Get Google Form structure with caching"""
-        now = datetime.now(timezone.utc)
-
-        if form_id in self.form_cache:
-            form_data, timestamp = self.form_cache[form_id]
-            if now - timestamp <= self.form_cache_ttl:
-                logger.debug(f"Form cache hit for {form_id}")
-                return form_data
-
-            logger.debug(f"Form cache expired for {form_id}")
-            del self.form_cache[form_id]
-
-        try:
-            data: Dict[str, Any] = self.service.forms().get(formId=form_id).execute()
-            print(json.dumps(data, indent=2))
-            self.form_cache[form_id] = (data, now)
-            logger.info(f"Fetched and cached form data for {form_id}")
-            return data
-
-        except HttpError as e:
-            logger.error(f"Google Forms API error for form {form_id}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error fetching form structure: {e}")
-            return None
-
-    def get_field_entry_id(self, form_id: str, field_name: str) -> Optional[str]:
+    def get_field_entry_id(self, form_id: str, field_name: str) -> Optional[int]:
         """
         Get entry ID for a field name with caching
 
@@ -94,7 +60,7 @@ class GoogleFormsFieldMapper:
             Entry ID (e.g., "entry.123456789") or None if not found
         """
         cache_key = (form_id, field_name)
-        entry_id: Optional[str] = None
+        entry_id: Optional[int] = None
 
         if cache_key in self.cache:
             entry_id, timestamp = self.cache[cache_key]
@@ -114,10 +80,40 @@ class GoogleFormsFieldMapper:
 
         return entry_id
 
-    def is_form_accessible(self, form_id: str) -> bool:
-        return bool(self._get_form(form_id))
+    def get_form(self, form_id: str) -> Optional[Dict[str, Any]]:
+        headers = {"Accept": "application/json"}
+        params = {"formId": form_id, "token": self.app_script_api_token}
 
-    def _fetch_field_entry_id(self, form_id: str, field_name: str) -> Optional[str]:
+        try:
+            response = requests.get(self.app_script_url, params=params, headers=headers)
+            response.raise_for_status()
+
+            data: Dict[str, Any] = response.json()
+            status_code = data["status"]
+            if status_code != 200:
+                raise Exception(
+                    f"Request error {status_code}: {data.get("error", "Unknown error")}"
+                )
+
+            mapping = data["mapping"]
+            for entry in mapping:
+                title = entry["title"]
+                if title in self.fields_to_cache:
+                    self.cache[(form_id, title)] = (
+                        entry["entryId"],
+                        datetime.now(timezone.utc),
+                    )
+
+            return data
+        except Exception as e:
+            logger.error(e)
+
+            return None
+
+    def is_form_accessible(self, form_id: str) -> bool:
+        return bool(self.get_form(form_id))
+
+    def _fetch_field_entry_id(self, form_id: str, field_name: str) -> Optional[int]:
         """
         Fetch field entry ID from Google Forms API
 
@@ -128,48 +124,30 @@ class GoogleFormsFieldMapper:
         Returns:
             Entry ID or None if not found
         """
-        form = self._get_form(form_id)
+        form = self.get_form(form_id)
         if not form:
             return None
 
-        items = form.get("items", [])
-        field_name_lower = field_name.lower()
-
-        for item in items:
-            title = item.get("title", "").lower()
-            description = item.get("description", "").lower()
-
-            if field_name_lower in title or field_name_lower in description:
-                question = item.get("questionItem", {}).get("question", {})
-                question_id = question.get("questionId")
-                if question_id:
-                    entry_id = f"entry.{question_id}"
-                    logger.info(
-                        f"Found entry ID {entry_id} for field '{field_name}' in form {form_id}"
-                    )
-                    return entry_id
+        mapping = form["mapping"]
+        for entry in mapping:
+            if field_name == entry["title"]:
+                entry_id: Optional[int] = entry["entryId"]
+                return entry_id
 
         logger.warning(f"Field '{field_name}' not found in form {form_id}")
+
         return None
 
     def clear_cache(self) -> None:
         """Clear all cached entries"""
         self.cache.clear()
-        self.form_cache.clear()
-        logger.info("Google Forms caches cleared")
+        logger.info("Google Forms cache cleared")
 
     def clear_expired_cache(self) -> None:
         """Remove expired entries from all caches"""
         now = datetime.now(timezone.utc)
-
         self.cache = {
             k: v for k, v in self.cache.items() if now - v[1] <= self.cache_ttl
-        }
-
-        self.form_cache = {
-            k: v
-            for k, v in self.form_cache.items()
-            if now - v[1] <= self.form_cache_ttl
         }
 
 
@@ -187,6 +165,8 @@ def get_forms_mapper() -> GoogleFormsFieldMapper:
     global _forms_mapper
     if _forms_mapper is None:
         settings = get_settings()
-        _forms_mapper = GoogleFormsFieldMapper(settings.google_credentials_path)
+        _forms_mapper = GoogleFormsFieldMapper(
+            settings.app_script_url, settings.app_script_api_key
+        )
 
     return _forms_mapper

@@ -4,7 +4,7 @@ Pydantic schemas for request/response validation
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ABTestBase(BaseModel):
@@ -37,8 +37,9 @@ class ABTestResponse(ABTestBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
 
 class ShortUrlResponse(BaseModel):
@@ -52,8 +53,9 @@ class ShortUrlResponse(BaseModel):
     date_created: datetime
     max_visits: Optional[int]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
 
 class ShortUrlWithTests(ShortUrlResponse):
@@ -62,8 +64,9 @@ class ShortUrlWithTests(ShortUrlResponse):
     ab_tests: list[ABTestResponse] = []
     total_probability: float = Field(default=0.0)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
 
 class LoginRequest(BaseModel):

@@ -3,7 +3,7 @@ Configuration management using environment variables
 """
 
 from pydantic import HttpUrl
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
@@ -20,11 +20,12 @@ class Settings(BaseSettings):
     secret_key: str
     jwt_secret: str
 
-    # Google Forms API
-    google_credentials_path: str = "credentials.json"
+    # App Script API
+    app_script_url: str
+    app_script_api_key: str
 
     # Application
-    app_name: str = "URL Redirect & A/B Testing"
+    app_name: str = "Shlink AB Tests"
     debug: bool = False
 
     # Session
@@ -34,9 +35,7 @@ class Settings(BaseSettings):
     # A/B Testing
     click_id_max_age_seconds: int = 60  # 1 minute
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 
 @lru_cache()

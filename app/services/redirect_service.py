@@ -53,7 +53,7 @@ class RedirectService:
         if result:
             logger.info(f"Resolved url={url} to short_url_id={result.id}")
         else:
-            logger.warning(f"Short url not found for: {url}")
+            logger.warning(f"URL not found for: {url}")
 
         return result
 

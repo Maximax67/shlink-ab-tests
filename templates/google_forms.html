@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Google Forms{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Dashboard</a>
+<a href="/admin/google_forms">Google Forms</a>
+<form action="/admin/logout" method="post" style="display: inline;">
+    <button type="submit" class="btn btn-secondary">Logout</button>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Google Forms Management</h2>
+    <p style="color: #666; margin-bottom: 1.5rem;">
+        Manage Google Forms mappings between edit links and responder links for proper field auto-filling.
+    </p>
+
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success">
+        {{ request.query_params.get('success') }}
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get('error') %}
+    <div class="alert alert-error">
+        {{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    <details style="margin-bottom: 2rem;" {% if not google_forms %}open{% endif %}>
+        <summary style="cursor: pointer; font-weight: 600; margin-bottom: 1rem;">+ Add New Google Form</summary>
+        <form action="/admin/google_forms/add" method="post"
+            style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
+            <div class="form-group">
+                <label for="edit_url">Google Form Edit URL</label>
+                <input type="text" id="edit_url" name="edit_url"
+                    placeholder="https://docs.google.com/forms/d/[FORM_ID]/edit" required>
+                <small style="color: #666;">
+                    Paste the edit link from Google Forms (must contain "/edit" in URL)
+                </small>
+            </div>
+            <button type="submit" class="btn btn-success">Add Form</button>
+        </form>
+    </details>
+
+    {% if google_forms %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Edit Form ID</th>
+                    <th>Responder Form ID</th>
+                    <th>Status</th>
+                    <th>Added</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in google_forms %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <code style="font-size: 0.875rem;">{{ form.form_id[:20] }}...</code>
+                            <a href="https://docs.google.com/forms/d/{{ form.form_id }}/edit" target="_blank"
+                                title="Open edit form" style="color: #3498db; text-decoration: none;">
+                                📝
+                            </a>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <code style="font-size: 0.875rem;">{{ form.responder_form_id[:20] }}...</code>
+                            <a href="https://docs.google.com/forms/d/e/{{ form.responder_form_id }}/viewform"
+                                target="_blank" title="Open responder form"
+                                style="color: #3498db; text-decoration: none;">
+                                👁️
+                            </a>
+                        </div>
+                    </td>
+                    <td>
+                        <span id="status-{{ form.id }}" class="badge badge-active">Active</span>
+                    </td>
+                    <td>{{ form.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <button onclick="verifyForm({{ form.id }}, '{{ form.form_id }}')" class="btn"
+                            id="verify-btn-{{ form.id }}">
+                            Verify Access
+                        </button>
+                        <form action="/admin/google_forms/{{ form.id }}/delete" method="post" style="display: inline;"
+                            onsubmit="return confirm('Are you sure you want to delete this form mapping?');">
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: #666;">
+        <p style="font-size: 1.1rem; margin-bottom: 1rem;">📝 No Google Forms added yet</p>
+        <p>Add your first form using the button above to enable auto-filling features.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>How to Use</h3>
+    <ol style="line-height: 2; margin-left: 1rem;">
+        <li>Open your Google Form</li>
+        <li>Add account who owns App Script as <strong>"Editor"</strong></li>
+        <li>Copy the link</li>
+        <li>Paste the edit link in the form above</li>
+        <li>The system will automatically fetch the responder ID from Google Forms API</li>
+        <li>Use the <strong>"Verify Access"</strong> button to ensure API access is working</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function verifyForm(formId, editFormId) {
+        const btn = document.getElementById(`verify-btn-${formId}`);
+        const status = document.getElementById(`status-${formId}`);
+
+        // Update UI
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+        status.className = 'badge badge-inactive';
+        status.textContent = 'Checking...';
+
+        try {
+            const response = await fetch(`/admin/google_forms/${formId}/verify`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                status.className = 'badge badge-active';
+                status.textContent = 'Active';
+
+                // Show success message temporarily
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Verified';
+                btn.style.background = '#27ae60';
+
+                setTimeout(() => {
+                    btn.textContent = 'Verify Access';
+                    btn.style.background = '';
+                }, 2000);
+            } else {
+                status.className = 'badge badge-inactive';
+                status.textContent = 'Error';
+                alert(`Verification failed: ${data.error}`);
+            }
+        } catch (error) {
+            status.className = 'badge badge-inactive';
+            status.textContent = 'Error';
+            alert(`Error verifying form: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            if (btn.textContent === 'Verifying...') {
+                btn.textContent = 'Verify Access';
+            }
+        }
+    }
+</script>
+{% endblock %}

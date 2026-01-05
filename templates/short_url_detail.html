@@ -2,6 +2,14 @@
 
 {% block title %}{{ short_url.short_code }} - Details{% endblock %}
 
+{% block nav %}
+<a href="/admin/dashboard">Dashboard</a>
+<a href="/admin/google_forms">Google Forms</a>
+<form action="/admin/logout" method="post" style="display: inline;">
+    <button type="submit" class="btn btn-secondary">Logout</button>
+</form>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <a href="/admin/dashboard" class="btn btn-secondary" style="margin-bottom: 1rem;">← Back to Dashboard</a>
@@ -40,8 +48,8 @@
         <tr>
             <th>Redirect URL</th>
             <td>
-                {% if short_url.redirect_url %}
-                <a href="{{ short_url.redirect_url }}" target="_blank">{{ short_url.redirect_url }}</a>
+                {% if redirect_url %}
+                <a href="{{ redirect_url }}" target="_blank">{{ redirect_url }}</a>
                 {% else %}
                 INVALID
                 {% endif %}

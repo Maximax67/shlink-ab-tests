@@ -221,9 +221,6 @@ except Exception as e:
     echo -e "${BLUE}Alternative: Production deployment${NC}"
     echo -e "   ${YELLOW}gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker${NC}"
     echo ""
-    echo -e "${BLUE}Docker deployment:${NC}"
-    echo -e "   ${YELLOW}docker-compose up -d${NC}"
-    echo ""
     print_success "Happy A/B testing! 🚀"
     echo ""
 }

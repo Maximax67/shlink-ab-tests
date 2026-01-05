@@ -5,13 +5,13 @@ Router for admin dashboard and A/B test management
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, Request, HTTPException, Form, Cookie, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import ShortUrl, ABTest
+from app.models import ShortUrl, ABTest, GoogleForm
 from app.schemas import (
     ABTestCreate,
     ABTestUpdate,
@@ -20,7 +20,9 @@ from app.schemas import (
 )
 from app.services.ab_test_service import ABTestService, ABTestValidationError
 from app.services.auth_service import AuthService
+from app.services.google_forms import get_forms_mapper
 from app.config import get_settings
+from app.services.url_builder import UrlBuilder
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -157,7 +159,7 @@ async def dashboard(
                 id=url.id,
                 short_code=url.short_code,
                 original_url=url.original_url,
-                redirect_url=url.redirect_url,
+                redirect_url=UrlBuilder.get_redirect_url(url.original_url),
                 title=url.title,
                 date_created=url.date_created,
                 max_visits=url.max_visits,
@@ -208,16 +210,247 @@ async def view_short_url(
 
     ab_tests = ABTestService(db).get_all_tests(short_url_id)
     total_prob = sum(t.probability for t in ab_tests if t.is_active)
+    redirect_url = UrlBuilder.get_redirect_url(short_url.original_url)
 
     return templates.TemplateResponse(
         "short_url_detail.html",
         {
             "request": request,
             "short_url": short_url,
+            "redirect_url": redirect_url,
             "ab_tests": ab_tests,
             "total_probability": total_prob,
             "remaining_probability": max(0, 1.0 - total_prob),
         },
+    )
+
+
+# ==================== Google Forms Routes ====================
+
+
+@router.get("/google_forms", response_class=HTMLResponse)
+async def google_forms_page(
+    request: Request,
+    session: str = Depends(verify_admin_session),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Display Google Forms management page
+
+    Args:
+        request: FastAPI request
+        session: Admin session token
+        db: Database session
+
+    Returns:
+        HTML response with Google Forms list
+    """
+    query = select(GoogleForm).order_by(GoogleForm.created_at.desc())
+    google_forms = list(db.execute(query).scalars().all())
+
+    return templates.TemplateResponse(
+        "google_forms.html",
+        {
+            "request": request,
+            "google_forms": google_forms,
+        },
+    )
+
+
+@router.post("/google_forms/add")
+async def add_google_form(
+    edit_url: str = Form(...),
+    session: str = Depends(verify_admin_session),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Add a new Google Form mapping
+
+    Args:
+        edit_url: Google Forms edit URL
+        session: Admin session token
+        db: Database session
+
+    Returns:
+        Redirect to Google Forms page
+    """
+    try:
+        # Extract form ID from edit URL
+        form_id = UrlBuilder.extract_form_id(edit_url)
+        if not form_id:
+            return RedirectResponse(
+                url="/admin/google_forms?error=Invalid Google Forms URL. Please use the edit link.",
+                status_code=303,
+            )
+
+        # Check if form already exists
+        existing = db.execute(
+            select(GoogleForm).where(GoogleForm.form_id == form_id)
+        ).scalar_one_or_none()
+
+        if existing:
+            return RedirectResponse(
+                url="/admin/google_forms?error=This form is already added.",
+                status_code=303,
+            )
+
+        # Get responder ID from Google Forms API
+        mapper = get_forms_mapper()
+        form_data = mapper.get_form(form_id)
+
+        if not form_data:
+            return RedirectResponse(
+                url="/admin/google_forms?error=Unable to access form. Check API credentials and form permissions.",
+                status_code=303,
+            )
+
+        # Extract responder ID from form data
+        responder_uri = form_data.get("prefilledUrl", "")
+        responder_id = UrlBuilder.extract_form_id(responder_uri)
+
+        if not responder_id:
+            return RedirectResponse(
+                url="/admin/google_forms?error=Unable to extract responder ID from form.",
+                status_code=303,
+            )
+
+        # Create new Google Form entry
+        from datetime import datetime, timezone
+
+        google_form = GoogleForm(
+            form_id=form_id,
+            responder_form_id=responder_id,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+
+        db.add(google_form)
+        db.commit()
+
+        logger.info(f"Added Google Form: {form_id} -> {responder_id}")
+
+        return RedirectResponse(
+            url="/admin/google_forms?success=Google Form added successfully!",
+            status_code=303,
+        )
+
+    except Exception as e:
+        logger.error(f"Error adding Google Form: {e}")
+        return RedirectResponse(
+            url=f"/admin/google_forms?error=Error: {str(e)}",
+            status_code=303,
+        )
+
+
+@router.post("/google_forms/{form_id}/verify")
+async def verify_google_form(
+    form_id: int,
+    session: str = Depends(verify_admin_session),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """
+    Verify Google Form access and update responder ID
+
+    Args:
+        form_id: Database ID of Google Form
+        session: Admin session token
+        db: Database session
+
+    Returns:
+        JSON response with verification status
+    """
+    try:
+        google_form = db.get(GoogleForm, form_id)
+        if not google_form:
+            return JSONResponse(
+                content={"success": False, "error": "Form not found"},
+                status_code=404,
+            )
+
+        # Try to fetch form from API
+        mapper = get_forms_mapper()
+        form_data = mapper.get_form(google_form.form_id)
+
+        if not form_data:
+            return JSONResponse(
+                content={
+                    "success": False,
+                    "error": "Unable to access form. Check API permissions.",
+                }
+            )
+
+        # Extract and verify responder ID
+        responder_uri = form_data.get("prefilledUrl", "")
+        responder_id = UrlBuilder.extract_form_id(responder_uri)
+
+        if not responder_id:
+            return JSONResponse(
+                content={
+                    "success": False,
+                    "error": "Unable to extract responder ID",
+                }
+            )
+
+        # Update if changed
+        if responder_id != google_form.responder_form_id:
+            from datetime import datetime, timezone
+
+            google_form.responder_form_id = responder_id
+            google_form.updated_at = datetime.now(timezone.utc)
+            db.commit()
+
+            logger.info(
+                f"Updated responder ID for form {google_form.form_id}: {responder_id}"
+            )
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": "Form verified successfully",
+                "responder_id": responder_id,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error verifying Google Form: {e}")
+        return JSONResponse(
+            content={"success": False, "error": str(e)},
+            status_code=500,
+        )
+
+
+@router.post("/google_forms/{form_id}/delete")
+async def delete_google_form(
+    form_id: int,
+    session: str = Depends(verify_admin_session),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Delete a Google Form mapping
+
+    Args:
+        form_id: Database ID of Google Form
+        session: Admin session token
+        db: Database session
+
+    Returns:
+        Redirect to Google Forms page
+    """
+    google_form = db.get(GoogleForm, form_id)
+    if not google_form:
+        return RedirectResponse(
+            url="/admin/google_forms?error=Form not found",
+            status_code=303,
+        )
+
+    db.delete(google_form)
+    db.commit()
+
+    logger.info(f"Deleted Google Form: {google_form.form_id}")
+
+    return RedirectResponse(
+        url="/admin/google_forms?success=Form deleted successfully",
+        status_code=303,
     )
 
 

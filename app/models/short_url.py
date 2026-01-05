@@ -1,6 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Optional
-from urllib.parse import parse_qs, urlparse
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -13,7 +12,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.services.url_builder import UrlBuilder
 from .base import Base
 
 if TYPE_CHECKING:
@@ -53,31 +51,3 @@ class ShortUrl(Base):
         Index("IDX_4A53F934115F0EE5", "domain_id"),
         Index("IDX_4A53F934C9EA6E08", "author_api_key_id"),
     )
-
-    @property
-    def redirect_url(self) -> Optional[str]:
-        """Extract the redirect-url from the original_url query parameter."""
-        try:
-            parsed = urlparse(self.original_url)
-            query_params = parse_qs(parsed.query)
-
-            redirect_url = query_params.get("url", [None])[0]
-            if redirect_url is None:
-                return None
-
-            del query_params["url"]
-
-            string_params: Dict[str, str] = {}
-
-            for param, value in query_params.items():
-                string_params[param] = value[0] if len(value) == 1 else str(value)
-
-            return UrlBuilder.build_url(
-                redirect_url,
-                True,
-                string_params,
-                None,
-                False,
-            )
-        except Exception:
-            return None

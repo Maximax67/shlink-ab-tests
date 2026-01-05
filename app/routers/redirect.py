@@ -23,7 +23,7 @@ async def redirect_short_url(
     Handle redirect for short code with A/B testing
 
     Args:
-        short_code: The short code to redirect
+        url: The URL parameter to redirect
         request: FastAPI request object
         db: Database session
 
@@ -35,13 +35,13 @@ async def redirect_short_url(
     """
     service = RedirectService(db)
 
-    # 1. Resolve short code
+    # 1. Resolve URL
     short_url = service.resolve_url(url)
     if not short_url:
         logger.warning(f"URL not found: {url}")
         raise HTTPException(status_code=404, detail="URL not found")
 
-    redirect_url = short_url.redirect_url
+    redirect_url = UrlBuilder.get_redirect_url(short_url.original_url)
     if not redirect_url:
         logger.warning(f"Redirect URL not found: {url}")
         raise HTTPException(status_code=404, detail="Redirect URL not found")
@@ -69,10 +69,12 @@ async def redirect_short_url(
     query_params = dict(request.query_params)
     del query_params["url"]
 
-    final_url = UrlBuilder.build_url(target_url, True, query_params, last_visit, True)
+    final_url = UrlBuilder.build_url(
+        target_url, True, query_params, last_visit, True, db
+    )
 
-    # 8. Log redirect
-    logger.info(f"Redirecting {short_url.short_code} -> {final_url} ")
+    # 7. Log redirect
+    logger.info(f"Redirecting {short_url.short_code} -> {final_url}")
 
-    # 9. Redirect user
+    # 8. Redirect user
     return RedirectResponse(url=final_url, status_code=307)
