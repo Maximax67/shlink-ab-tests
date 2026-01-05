@@ -4,9 +4,11 @@ Main FastAPI application
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.routers import redirect, admin
 from app.services.auth_service import AuthService
@@ -63,6 +65,10 @@ async def health() -> Dict[str, str]:
     """Health check endpoint"""
     return {"status": "ok"}
 
+
+public_dir = Path(__file__).parent.parent / "public"
+if public_dir.exists():
+    app.mount("/", StaticFiles(directory=public_dir), name="static")
 
 if __name__ == "__main__":
     import uvicorn
