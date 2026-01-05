@@ -28,7 +28,9 @@ jinja2
 
 # Utilities
 python-dateutil
+python-multipart
 PyJWT
+requests
 
 # Development
 pytest
