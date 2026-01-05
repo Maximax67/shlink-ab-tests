@@ -2,6 +2,7 @@
 Router for admin dashboard and A/B test management
 """
 
+from datetime import datetime, timezone
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, Request, HTTPException, Form, Cookie, Response
@@ -314,12 +315,11 @@ async def add_google_form(
                 status_code=303,
             )
 
-        # Create new Google Form entry
-        from datetime import datetime, timezone
-
+        form_title = form_data.get("title", "")
         google_form = GoogleForm(
             form_id=form_id,
             responder_form_id=responder_id,
+            title=form_title,
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
@@ -392,16 +392,18 @@ async def verify_google_form(
             )
 
         # Update if changed
-        if responder_id != google_form.responder_form_id:
-            from datetime import datetime, timezone
-
+        form_title = form_data.get("title", "")
+        if (
+            responder_id != google_form.responder_form_id
+            or form_title != google_form.title
+        ):
             google_form.responder_form_id = responder_id
+            google_form.title = form_title
             google_form.updated_at = datetime.now(timezone.utc)
-            db.commit()
 
-            logger.info(
-                f"Updated responder ID for form {google_form.form_id}: {responder_id}"
-            )
+            logger.info(f"Updating form {google_form.form_id}")
+
+            db.commit()
 
         return JSONResponse(
             content={

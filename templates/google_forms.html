@@ -50,6 +50,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>Title</th>
                     <th>Edit Form ID</th>
                     <th>Responder Form ID</th>
                     <th>Status</th>
@@ -60,6 +61,7 @@
             <tbody>
                 {% for form in google_forms %}
                 <tr>
+                    <td>{{ form.title }}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <code style="font-size: 0.875rem;">{{ form.form_id[:20] }}...</code>

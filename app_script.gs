@@ -54,8 +54,9 @@ function handleRequest_(e) {
 
     // Open the form (script owner must have Editor access)
     const form = FormApp.openById(formId);
+    const formTitle = form.getTitle();
 
-        // Collect items and add default responses for prefillable items
+    // Collect items and add default responses for prefillable items
     const items = form.getItems();
     const response = form.createResponse();
     const records = []; // { title, itemId, type, entryId, _defaultResponse }
@@ -106,6 +107,7 @@ function handleRequest_(e) {
 
     return jsonResponse_({
       formId: formId,
+      title: formTitle,
       prefilledUrl: prefilledUrl,
       mapping: records
     }, 200);
