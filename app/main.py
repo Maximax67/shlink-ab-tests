@@ -69,8 +69,3 @@ async def health() -> Dict[str, str]:
 public_dir = Path(__file__).parent.parent / "public"
 if public_dir.exists():
     app.mount("/", StaticFiles(directory=public_dir), name="static")
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=settings.debug)

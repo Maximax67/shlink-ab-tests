@@ -31,6 +31,4 @@ python-dateutil
 python-multipart
 PyJWT
 requests
-
-# Development
-pytest
+httpx
