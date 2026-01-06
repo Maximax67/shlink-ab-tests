@@ -1,13 +1,17 @@
 from datetime import datetime
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import (
     Integer,
     String,
     DateTime,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from app.models.form_entry import FormEntry
 
 
 class GoogleForm(Base):
@@ -34,4 +38,11 @@ class GoogleForm(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
+
+    entries: Mapped[List["FormEntry"]] = relationship(
+        "FormEntry",
+        back_populates="google_form",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )

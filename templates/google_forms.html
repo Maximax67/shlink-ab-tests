@@ -86,9 +86,9 @@
                     </td>
                     <td>{{ form.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
-                        <button onclick="verifyForm({{ form.id }}, '{{ form.form_id }}')" class="btn"
-                            id="verify-btn-{{ form.id }}">
-                            Verify Access
+                        <button onclick="refreshForm({{ form.id }}, '{{ form.form_id }}')" class="btn"
+                            id="refresh-btn-{{ form.id }}">
+                            Refresh
                         </button>
                         <form action="/admin/google_forms/{{ form.id }}/delete" method="post" style="display: inline;"
                             onsubmit="return confirm('Are you sure you want to delete this form mapping?');">
@@ -116,25 +116,25 @@
         <li>Copy the link</li>
         <li>Paste the edit link in the form above</li>
         <li>The system will automatically fetch the responder ID from Google Forms API</li>
-        <li>Use the <strong>"Verify Access"</strong> button to ensure API access is working</li>
+        <li>Use the <strong>"Refresh"</strong> button to update saved fields mappings</li>
     </ol>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    async function verifyForm(formId, editFormId) {
-        const btn = document.getElementById(`verify-btn-${formId}`);
+    async function refreshForm(formId, editFormId) {
+        const btn = document.getElementById(`refresh-btn-${formId}`);
         const status = document.getElementById(`status-${formId}`);
 
         // Update UI
         btn.disabled = true;
-        btn.textContent = 'Verifying...';
+        btn.textContent = 'Refreshing';
         status.className = 'badge badge-inactive';
-        status.textContent = 'Checking...';
+        status.textContent = 'Checking';
 
         try {
-            const response = await fetch(`/admin/google_forms/${formId}/verify`, {
+            const response = await fetch(`/admin/google_forms/${formId}/refresh`, {
                 method: 'POST'
             });
 
@@ -146,26 +146,26 @@
 
                 // Show success message temporarily
                 const originalText = btn.textContent;
-                btn.textContent = '✓ Verified';
+                btn.textContent = '✓ Refreshed';
                 btn.style.background = '#27ae60';
 
                 setTimeout(() => {
-                    btn.textContent = 'Verify Access';
+                    btn.textContent = 'Refresh';
                     btn.style.background = '';
                 }, 2000);
             } else {
                 status.className = 'badge badge-inactive';
                 status.textContent = 'Error';
-                alert(`Verification failed: ${data.error}`);
+                alert(`Refreshing failed: ${data.error}`);
             }
         } catch (error) {
             status.className = 'badge badge-inactive';
             status.textContent = 'Error';
-            alert(`Error verifying form: ${error.message}`);
+            alert(`Error refreshing form: ${error.message}`);
         } finally {
             btn.disabled = false;
-            if (btn.textContent === 'Verifying...') {
-                btn.textContent = 'Verify Access';
+            if (btn.textContent === 'Refreshing') {
+                btn.textContent = 'Refresh';
             }
         }
     }

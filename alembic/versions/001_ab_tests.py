@@ -20,15 +20,28 @@ depends_on = None
 
 def upgrade() -> None:
     """Create ab_tests table"""
+    short_url_id_type = sa.BigInteger().with_variant(
+        BIGINT(unsigned=True),
+        "mysql",
+    )
+
     op.create_table(
         "ab_tests",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("short_url_id", BIGINT(unsigned=True), nullable=False),
+        sa.Column("short_url_id", short_url_id_type, nullable=False),
         sa.Column("target_url", sa.Text(), nullable=False),
         sa.Column("probability", sa.Float(), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default="1"),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.func.now(),
+            onupdate=sa.func.now(),
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(
             ["short_url_id"], ["short_urls.id"], ondelete="CASCADE"

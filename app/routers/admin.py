@@ -46,6 +46,22 @@ def verify_admin_session(
     return admin_session
 
 
+def verify_admin_session_html(
+    request: Request,
+    admin_session: Optional[str] = Cookie(None, alias=settings.session_cookie_name),
+) -> str | RedirectResponse:
+    """
+    Dependency to verify admin session for HTML requests
+    """
+    if not admin_session or not AuthService.verify_session(admin_session):
+        return RedirectResponse(
+            url="/admin/login",
+            status_code=303,
+        )
+
+    return admin_session
+
+
 # ==================== Authentication Routes ====================
 
 
@@ -107,7 +123,7 @@ async def dashboard(
     page: int = 1,
     limit: int = 20,
     search: Optional[str] = None,
-    session: str = Depends(verify_admin_session),
+    session: str | RedirectResponse = Depends(verify_admin_session_html),
     db: Session = Depends(get_db),
 ) -> Response:
     """
@@ -124,6 +140,9 @@ async def dashboard(
     Returns:
         HTML response with dashboard
     """
+    if isinstance(session, RedirectResponse):
+        return session
+
     # Build query
     settings = get_settings()
     app_url = str(settings.app_url).rstrip("/")
@@ -190,7 +209,7 @@ async def dashboard(
 async def view_short_url(
     request: Request,
     short_url_id: int,
-    session: str = Depends(verify_admin_session),
+    session: str | RedirectResponse = Depends(verify_admin_session_html),
     db: Session = Depends(get_db),
 ) -> Response:
     """
@@ -205,6 +224,9 @@ async def view_short_url(
     Returns:
         HTML response with short URL details
     """
+    if isinstance(session, RedirectResponse):
+        return session
+
     short_url = db.get(ShortUrl, short_url_id)
     if not short_url:
         raise HTTPException(status_code=404, detail="Short URL not found")
@@ -232,7 +254,7 @@ async def view_short_url(
 @router.get("/google_forms", response_class=HTMLResponse)
 async def google_forms_page(
     request: Request,
-    session: str = Depends(verify_admin_session),
+    session: str | RedirectResponse = Depends(verify_admin_session_html),
     db: Session = Depends(get_db),
 ) -> Response:
     """
@@ -246,6 +268,9 @@ async def google_forms_page(
     Returns:
         HTML response with Google Forms list
     """
+    if isinstance(session, RedirectResponse):
+        return session
+
     query = select(GoogleForm).order_by(GoogleForm.created_at.desc())
     google_forms = list(db.execute(query).scalars().all())
 
@@ -327,6 +352,8 @@ async def add_google_form(
         db.add(google_form)
         db.commit()
 
+        mapper.update_mapping(db, form_id, form_data)
+
         logger.info(f"Added Google Form: {form_id} -> {responder_id}")
 
         return RedirectResponse(
@@ -342,14 +369,14 @@ async def add_google_form(
         )
 
 
-@router.post("/google_forms/{form_id}/verify")
-async def verify_google_form(
+@router.post("/google_forms/{form_id}/refresh")
+async def refresh_google_form(
     form_id: int,
     session: str = Depends(verify_admin_session),
     db: Session = Depends(get_db),
 ) -> JSONResponse:
     """
-    Verify Google Form access and update responder ID
+    Refresh Google Form access and update responder ID and mappings
 
     Args:
         form_id: Database ID of Google Form
@@ -405,10 +432,12 @@ async def verify_google_form(
 
             db.commit()
 
+        mapper.update_mapping(db, google_form.form_id, form_data)
+
         return JSONResponse(
             content={
                 "success": True,
-                "message": "Form verified successfully",
+                "message": "Form refreshed successfully",
                 "responder_id": responder_id,
             }
         )

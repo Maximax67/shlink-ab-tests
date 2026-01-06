@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.services.google_forms import get_forms_mapper
+from app.services.google_forms import GoogleFormsFieldMapper
 from app.config import get_settings
 from app.models.visit import Visit
 from app.models.google_form import GoogleForm
@@ -120,16 +120,9 @@ class UrlBuilder:
                 f"Using edit form ID {form_id} for responder form {responder_form_id}"
             )
 
-            # Get forms mapper
-            mapper = get_forms_mapper()
-
-            if not mapper.is_form_accessible(form_id):
-                logger.warning(f"Form {form_id} not accessible via API")
-                return params
-
-            # Map utm_source if present
+            entries = GoogleFormsFieldMapper.get_field_to_entry_mappings(db, form_id)
             if "utm_source" in query_params:
-                entry_id = mapper.get_field_entry_id(form_id, "utm_source")
+                entry_id = entries.get("utm_source")
                 if entry_id:
                     params[f"entry.{entry_id}"] = query_params["utm_source"]
                     logger.info(f"Mapped utm_source to {entry_id}")
@@ -138,7 +131,7 @@ class UrlBuilder:
 
             # Map utm_medium if present
             if "utm_medium" in query_params:
-                entry_id = mapper.get_field_entry_id(form_id, "utm_medium")
+                entry_id = entries.get("utm_medium")
                 if entry_id:
                     params[f"entry.{entry_id}"] = query_params["utm_medium"]
                     logger.info(f"Mapped utm_medium to {entry_id}")
@@ -147,7 +140,7 @@ class UrlBuilder:
 
             # Map utm_campaign if present
             if "utm_campaign" in query_params:
-                entry_id = mapper.get_field_entry_id(form_id, "utm_campaign")
+                entry_id = entries.get("utm_campaign")
                 if entry_id:
                     params[f"entry.{entry_id}"] = query_params["utm_campaign"]
                     logger.info(f"Mapped utm_campaign to {entry_id}")
@@ -156,12 +149,12 @@ class UrlBuilder:
 
             # Map click_id if appropriate
             if last_visit and UrlBuilder.should_include_click_id(last_visit):
-                entry_id = mapper.get_field_entry_id(form_id, "click_id")
+                entry_id = entries.get("click_id")
                 if entry_id:
                     params[f"entry.{entry_id}"] = str(last_visit.id)
                     logger.info(f"Mapped click_id to {entry_id}")
 
-                time_entry_id = mapper.get_field_entry_id(form_id, "click_timestamp")
+                time_entry_id = entries.get("click_timestamp")
                 if time_entry_id:
                     params[f"entry.{time_entry_id}"] = str(last_visit.date)
                     logger.info(f"Mapped click_timestamp to {time_entry_id}")
