@@ -215,8 +215,9 @@ class TestAdminAuth:
 
     def test_admin_dashboard_requires_auth(self, client: TestClient) -> None:
         """Test that dashboard requires authentication"""
-        response = client.get("/admin/dashboard")
-        assert response.status_code == 401
+        response = client.get("/admin/dashboard", follow_redirects=False)
+        assert response.status_code == 303
+        assert response.has_redirect_location
 
 
 class TestRedirectService:
