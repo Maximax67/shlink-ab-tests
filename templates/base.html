@@ -107,6 +107,48 @@
             background: #7f8c8d;
         }
 
+        .nav-wrapper {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .nav-toggle {
+            display: none; /* hidden on desktop */
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .nav-toggle {
+                display: inline-block; /* show hamburger */
+            }
+            .nav-links {
+                display: none; /* hide links initially */
+                flex-direction: column;
+                background: #2c3e50;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                width: 200px;
+                padding: 1rem;
+                border-radius: 0 0 8px 8px;
+                z-index: 100;
+            }
+            .nav-links a,
+            .nav-links form {
+                margin-bottom: 0.5rem;
+            }
+            .nav-links.show {
+                display: flex;
+            }
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -260,11 +302,16 @@
         <div class="container">
             <h1>Shlink AB Tests</h1>
             <nav>
-                {% block nav %}
-                <form action="/admin/logout" method="post" style="display: inline;">
-                    <button type="submit" class="btn btn-secondary">Logout</button>
-                </form>
-                {% endblock %}
+                <div class="nav-wrapper">
+                    <button class="nav-toggle btn btn-secondary">☰</button>
+                    <div class="nav-links">
+                        {% block nav %}
+                        <form action="/admin/logout" method="post" style="display: inline;">
+                            <button type="submit" class="btn btn-secondary">Logout</button>
+                        </form>
+                        {% endblock %}
+                    </div>
+                </div>
             </nav>
         </div>
     </header>
@@ -272,6 +319,22 @@
     <div class="container">
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+        const navToggle = document.querySelector('.nav-toggle');
+        const navLinks = document.querySelector('.nav-links');
+
+        navToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navLinks.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!navLinks.contains(e.target) && !navToggle.contains(e.target)) {
+                navLinks.classList.remove('show');
+            }
+        });
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

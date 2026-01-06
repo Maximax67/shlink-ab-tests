@@ -28,46 +28,48 @@
 
     <h2>Short URL: {{ short_url.short_code }}</h2>
 
-    <table style="margin-bottom: 2rem;">
-        <tr>
-            <th style="width: 200px;">ID</th>
-            <td>{{ short_url.id }}</td>
-        </tr>
-        <tr>
-            <th>Short Code</th>
-            <td><strong>{{ short_url.short_code }}</strong></td>
-        </tr>
-        <tr>
-            <th>Title</th>
-            <td>{{ short_url.title or '-' }}</td>
-        </tr>
-        <tr>
-            <th>Original URL</th>
-            <td><a href="{{ short_url.original_url }}" target="_blank">{{ short_url.original_url }}</a></td>
-        </tr>
-        <tr>
-            <th>Redirect URL</th>
-            <td>
-                {% if redirect_url %}
-                <a href="{{ redirect_url }}" target="_blank">{{ redirect_url }}</a>
-                {% else %}
-                INVALID
-                {% endif %}
-            </td>
-        </tr>
-        <tr>
-            <th>Forward Query Params</th>
-            <td>{{ 'Yes' if short_url.forward_query else 'No' }}</td>
-        </tr>
-        <tr>
-            <th>Created</th>
-            <td>{{ short_url.date_created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        </tr>
-        <tr>
-            <th>Max Visits</th>
-            <td>{{ short_url.max_visits or 'Unlimited' }}</td>
-        </tr>
-    </table>
+    <div class="table-wrapper">
+        <table style="margin-bottom: 2rem;">
+            <tr>
+                <th style="width: 200px;">ID</th>
+                <td>{{ short_url.id }}</td>
+            </tr>
+            <tr>
+                <th>Short Code</th>
+                <td><strong>{{ short_url.short_code }}</strong></td>
+            </tr>
+            <tr>
+                <th>Title</th>
+                <td>{{ short_url.title or '-' }}</td>
+            </tr>
+            <tr>
+                <th>Original URL</th>
+                <td><a href="{{ short_url.original_url }}" target="_blank">{{ short_url.original_url }}</a></td>
+            </tr>
+            <tr>
+                <th>Redirect URL</th>
+                <td>
+                    {% if redirect_url %}
+                    <a href="{{ redirect_url }}" target="_blank">{{ redirect_url }}</a>
+                    {% else %}
+                    INVALID
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Forward Query Params</th>
+                <td>{{ 'Yes' if short_url.forward_query else 'No' }}</td>
+            </tr>
+            <tr>
+                <th>Created</th>
+                <td>{{ short_url.date_created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            <tr>
+                <th>Max Visits</th>
+                <td>{{ short_url.max_visits or 'Unlimited' }}</td>
+            </tr>
+        </table>
+    </div>
 </div>
 
 <div class="card">
@@ -155,7 +157,7 @@
     </div>
 
     <details style="margin-top: 2rem;">
-        <summary style="cursor: pointer; font-weight: 600; margin-bottom: 1rem;">+ Create New A/B Test</summary>
+        <summary style="cursor: pointer; font-weight: 600; margin-bottom: 1rem;">Create New A/B Test</summary>
         <form action="/admin/short_url/{{ short_url.id }}/ab_test" method="post"
             style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin-top: 1rem;">
             <div class="form-group">

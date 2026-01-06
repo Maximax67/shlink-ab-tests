@@ -2,6 +2,50 @@
 
 {% block title %}Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+    .search-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .search-form input[type="text"] {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .search-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .search-form {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-buttons {
+            flex-direction: column;
+        }
+
+        .search-buttons .btn {
+            width: 100%;
+            margin: 0;
+            line-height: 1;
+            text-align: center;
+        }
+
+        .search-form input[type="text"] {
+            width: 100%;
+            margin: 0;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block nav %}
 <a href="/admin/dashboard">Dashboard</a>
 <a href="/admin/google_forms">Google Forms</a>
@@ -15,12 +59,14 @@
     <h2>Short URLs</h2>
 
     <div class="search-box">
-        <form method="get" action="/admin/dashboard" style="display: flex; align-items: center;">
+        <form method="get" action="/admin/dashboard" class="search-form">
             <input type="text" name="search" placeholder="Search by short code or title..." value="{{ search }}">
-            <button type="submit" class="btn">Search</button>
-            {% if search %}
-            <a href="/admin/dashboard" class="btn btn-secondary" style="margin-left: 0.5rem;">Clear</a>
-            {% endif %}
+            <div class="search-buttons">
+                <button type="submit" class="btn">Search</button>
+                {% if search %}
+                <a href="/admin/dashboard" class="btn btn-secondary">Clear</a>
+                {% endif %}
+            </div>
         </form>
     </div>
 
