@@ -3,6 +3,15 @@ Basic test suite for the application
 Run with: pytest test_app.py -v
 """
 
+import os
+
+os.environ.setdefault("APP_URL", "http://testserver")
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
+os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("APP_SCRIPT_URL", "http://localhost/script")
+os.environ.setdefault("APP_SCRIPT_API_KEY", "test-api-key")
+
 from typing import Any, Generator
 import pytest
 from datetime import datetime, timezone
