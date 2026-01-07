@@ -301,16 +301,15 @@
     <header>
         <div class="container">
             <h1>Shlink AB Tests</h1>
-            <nav>
-                <div class="nav-wrapper">
-                    <button class="nav-toggle btn btn-secondary">☰</button>
-                    <div class="nav-links">
-                        {% block nav %}
-                        <form action="/admin/logout" method="post" style="display: inline;">
-                            <button type="submit" class="btn btn-secondary">Logout</button>
-                        </form>
-                        {% endblock %}
-                    </div>
+            <nav class="nav-wrapper">
+                <button class="nav-toggle btn btn-secondary">☰</button>
+                <div class="nav-links">
+                    <a href="/admin/dashboard">Dashboard</a>
+                    <a href="/admin/google_forms">Google Forms</a>
+                    <a href="https://app.shlink.io" target="_blank">Shlink</a>
+                    <form action="/admin/logout" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-secondary">Logout</button>
+                    </form>
                 </div>
             </nav>
         </div>
