@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import redirect, admin
+from app.routers import redirect, admin, sync
 from app.services.auth_service import AuthService
 from app.config import get_settings
 
@@ -58,9 +58,10 @@ app.add_middleware(
 # Include routers
 app.include_router(admin.router, tags=["Admin"])
 app.include_router(redirect.router, tags=["Redirect"])
+app.include_router(sync.router, tags=["Sync"])
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health() -> Dict[str, str]:
     """Health check endpoint"""
     return {"status": "ok"}

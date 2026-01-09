@@ -7,6 +7,7 @@ import os
 
 os.environ.setdefault("APP_URL", "http://testserver")
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("API_TOKEN", "test-api-token")
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault("APP_SCRIPT_URL", "http://localhost/script")

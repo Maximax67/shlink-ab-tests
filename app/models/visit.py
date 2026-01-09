@@ -10,10 +10,12 @@ from sqlalchemy import (
     Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from .base import Base
 
 if TYPE_CHECKING:
     from .short_url import ShortUrl
+    from .visit_location import VisitLocation
 
 
 class Visit(Base):
@@ -38,6 +40,9 @@ class Visit(Base):
     # Relationships
     short_url: Mapped[Optional["ShortUrl"]] = relationship(
         "ShortUrl", back_populates="visits"
+    )
+    location: Mapped[Optional["VisitLocation"]] = relationship(
+        "VisitLocation", back_populates="visit"
     )
 
     __table_args__ = (

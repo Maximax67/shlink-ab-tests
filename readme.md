@@ -165,7 +165,8 @@ The application automatically prefills Google Forms fields:
 2. **click_id**: Only included if last visit was ≤ 1 minute ago
 
 Example:
-```
+
+```text
 Input:  /{short_code}?utm_source=email
 Output: https://docs.google.com/forms/d/.../viewform?entry.123=email&entry.456=98765
 ```

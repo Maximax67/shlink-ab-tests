@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Security
     admin_token: str
     jwt_secret: str
+    api_token: str
 
     # App Script API
     app_script_url: str
